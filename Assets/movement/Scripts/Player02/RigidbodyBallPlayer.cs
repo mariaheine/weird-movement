@@ -1,6 +1,11 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
+﻿/*
+
+Based off rigidbody movement tutorial by catlikecoding at:
+
+https://catlikecoding.com/unity/tutorials/movement/
+
+*/
+
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -39,6 +44,9 @@ public class RigidbodyBallPlayer : MonoBehaviour
     [SerializeField]
     Button _debugContinueButton;
 
+    [SerializeField]
+    Transform playerInputSpace = default;
+
     /* 
      Interpolate mode of a Rigidbody. Setting it to Interpolate makes it linearly 
      interpolate between its last and current position, so it will lag a bit behind 
@@ -62,6 +70,10 @@ public class RigidbodyBallPlayer : MonoBehaviour
     void Awake()
     {
         // -------------
+        
+        //TODO move mouse management somewhere else
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
 
         _body = GetComponent<Rigidbody>();
         OnValidate();
@@ -91,7 +103,27 @@ public class RigidbodyBallPlayer : MonoBehaviour
         playerInput = Vector2.ClampMagnitude(playerInput, 1f); // ? is it another way to normalize
 
         // Update desired velocity on each frame
-        _desiredVelocity = new Vector3(playerInput.x, 0f, playerInput.y) * _maxSpeed;
+        if (playerInputSpace)
+        {
+            Vector3 forward = playerInputSpace.forward;
+			forward.y = 0f;
+			forward.Normalize();
+			Vector3 right = playerInputSpace.right;
+			right.y = 0f;
+			right.Normalize();
+
+            // _desiredVelocity = playerInputSpace.TransformDirection(
+            //     playerInput.x, 0f, playerInput.y
+            // ) * _maxSpeed;
+
+			_desiredVelocity =
+				(forward * playerInput.y + right * playerInput.x) * _maxSpeed;
+        }
+        else
+        {
+            _desiredVelocity =
+                new Vector3(playerInput.x, 0f, playerInput.y) * _maxSpeed;
+        }
 
         // * Cool use of OR assignment, this will only be able to set to true
         _desiredJump |= Input.GetButtonDown("Jump");
@@ -155,8 +187,10 @@ public class RigidbodyBallPlayer : MonoBehaviour
     {
         // -------------
 
+        // * consider blocking that for a gliding goblin
+
         if (_jumpPhase > 0)
-        {        
+        {
             return false;
         }
 
@@ -194,8 +228,6 @@ public class RigidbodyBallPlayer : MonoBehaviour
         {
             _velocity = (_velocity - hit.normal * dot).normalized * speed;
         }
-
-        Debug.Log("Ground snapping");
 
         return true;
 
@@ -242,9 +274,7 @@ public class RigidbodyBallPlayer : MonoBehaviour
     {
         // -------------
 
-        
-        DebugStep("Clearing state" + _jumpPhase, Color.yellow, false);
-
+        // DebugStep("Clearing state" + _jumpPhase, Color.yellow, false);
 
         _groundContactCount = _steepContactCount = 0;
         _contactNormal = _steepContactNormal = Vector3.zero;
@@ -281,7 +311,7 @@ public class RigidbodyBallPlayer : MonoBehaviour
     {
         // -------------
 
-        DebugStep("Trying to jump", Color.red);
+        // DebugStep("Trying to jump", Color.red);
 
         _body.velocity = _velocity;
 
@@ -301,7 +331,7 @@ public class RigidbodyBallPlayer : MonoBehaviour
             //* That is just a design decision about jump behaviour
             _velocity += _contactNormal * jumpSpeed;
 
-            DebugStep("Jumped" + _jumpPhase, Color.yellow);
+            // DebugStep("Jumped" + _jumpPhase, Color.yellow);
         }
 
         // -------------
@@ -343,11 +373,6 @@ public class RigidbodyBallPlayer : MonoBehaviour
                 _steepContactCount++;
                 _steepContactNormal += normal;
             }
-
-            if (IsGrounded)
-            {
-                DebugStep("Evaluated collision to be grounded", Color.blue, false);
-            }
         }
     }
 
@@ -361,7 +386,7 @@ public class RigidbodyBallPlayer : MonoBehaviour
     {
         if (_printDebugs)
         {
-            Debug.Log($"<color=#{ColorUtility.ToHtmlStringRGB(color)}>{message}</color>");
+            // Debug.Log($"<color=#{ColorUtility.ToHtmlStringRGB(color)}>{message}</color>");
 
             if (pauseGame)
             {
@@ -370,7 +395,8 @@ public class RigidbodyBallPlayer : MonoBehaviour
 
                 _debugContinueButton.gameObject.SetActive(true);
                 _debugContinueButton.onClick.RemoveAllListeners();
-                _debugContinueButton.onClick.AddListener(() => {
+                _debugContinueButton.onClick.AddListener(() =>
+                {
                     Time.fixedDeltaTime = fixedDeltaTime;
                     Time.timeScale = timeScale;
                     _debugContinueButton.gameObject.SetActive(false);
